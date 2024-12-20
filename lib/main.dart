@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_recognizer_app/commands_manager.dart';
@@ -52,10 +52,8 @@ Future<String?> listenToCommand({
     partialResults: false,
   );
 
-  // Wait for timeout duration
   await Future.delayed(timeoutDuration);
 
-  // Stop listening after timeout
   await speechToText.stop();
   return response;
 }
@@ -96,16 +94,13 @@ class _MyHomePageState extends State<MyHomePage> {
     });
 
     while (_isProcessing) {
-      // Randomly select a command
       final randomCommand = (_commands..shuffle()).first;
       setState(() {
         _currentCommand = randomCommand;
       });
 
-      // Speak the command
       _ttsService.speak(randomCommand);
 
-      // Wait for the user's response
       await _listenToResponse(randomCommand);
 
       if (!_isProcessing) break;
@@ -117,44 +112,46 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-Future<void> _listenToResponse(String command) async {
-  final completer = Completer<void>();
-  String? userResponse;
+  Future<void> _listenToResponse(String command) async {
+    final completer = Completer<void>();
+    String? userResponse;
 
-  // Speak the command
-  _ttsService.speak(command);
+    _ttsService.speak(command);
 
-  // Wait for TTS to finish (introduce a delay)
-  await Future.delayed(const Duration(seconds: 2));
+    // Wait for TTS to finish (introduce a delay)
+    await Future.delayed(const Duration(seconds: 2));
 
-  // Start a response timer
-  _responseTimer = Timer(const Duration(seconds: 10), () {
-    completer.complete();
-  });
-
-  // Start listening to the user's response
-  userResponse = await listenToCommand(
-    onResult: (result) {
-      userResponse = result;
+    // Start a response timer
+    _responseTimer = Timer(const Duration(seconds: 10), () {
       completer.complete();
-    },
-    timeoutDuration: const Duration(seconds: 10),
-  );
+    });
 
-  // Wait for the timer or user response
-  await completer.future;
-  _responseTimer?.cancel();
+    // Start listening to the user's response
+    userResponse = await listenToCommand(
+      onResult: (result) {
+        userResponse = result;
+        completer.complete();
+      },
+      timeoutDuration: const Duration(seconds: 10),
+    );
 
-  if (userResponse != null && userResponse!.isNotEmpty) {
-    // Save the command and response
-    _commandsAndResponses.add({'command': command, 'response': userResponse!});
-    await _saveResponsesToFile();
+    // Wait for the timer or user response
+    await completer.future;
+    _responseTimer?.cancel();
+
+    if (userResponse != null && userResponse!.isNotEmpty) {
+      // Save the command and response
+      _commandsAndResponses.add({'command': command, 'response': userResponse!});
+      await _saveResponsesToFile();
+    }
   }
-}
-
 
   Future<void> _saveResponsesToFile() async {
-    final filePath = '/storage/emulated/0/Download/commands_responses.txt';
+    final directory = Platform.isAndroid
+        ? Directory('/storage/emulated/0/Download')
+        : await getApplicationDocumentsDirectory();
+    final filePath = '${directory.path}/commands_responses.txt';
+
     final file = File(filePath);
     final lines = _commandsAndResponses
         .map((entry) => 'Command: ${entry['command']}\nResponse: ${entry['response']}\n---')
@@ -171,21 +168,21 @@ Future<void> _listenToResponse(String command) async {
     _responseTimer?.cancel();
   }
 
-void _addCommand() async {
-  final newCommands = _commandController.text
-      .split('\n')
-      .map((command) => command.trim())
-      .where((command) => command.isNotEmpty)
-      .toList();
+  void _addCommand() async {
+    final newCommands = _commandController.text
+        .split('\n')
+        .map((command) => command.trim())
+        .where((command) => command.isNotEmpty)
+        .toList();
 
-  if (newCommands.isNotEmpty) {
-    await _commandManager.addCommands(newCommands);
-    setState(() {
-      _commands.addAll(newCommands);
-    });
-    _commandController.clear();
+    if (newCommands.isNotEmpty) {
+      await _commandManager.addCommands(newCommands);
+      setState(() {
+        _commands.addAll(newCommands);
+      });
+      _commandController.clear();
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +192,8 @@ void _addCommand() async {
       ),
       body: SizedBox(
         height: MediaQuery.of(context).size.height - 100,
-        child: SingleChildScrollView(padding: EdgeInsets.symmetric(horizontal: 16.0) ,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [

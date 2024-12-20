@@ -1,12 +1,22 @@
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 
 class CommandManager {
   final String _commandsFileName = 'user_commands.txt';
 
-  /// Gets the file path in the "Downloads" directory.
+  /// Gets the file path based on the platform.
   Future<File> _getCommandsFile() async {
-    final directory = Directory('/storage/emulated/0/Download');
+    Directory directory;
+
+    if (Platform.isAndroid) {
+      directory = Directory('/storage/emulated/0/Download');
+    } else if (Platform.isIOS) {
+      directory = await getApplicationDocumentsDirectory();
+    } else {
+      throw UnsupportedError("Unsupported platform");
+    }
+
     return File('${directory.path}/$_commandsFileName');
   }
 
@@ -18,14 +28,18 @@ class CommandManager {
     }
   }
 
-  /// Requests storage permissions.
+  /// Requests storage permissions for Android.
   Future<bool> _requestStoragePermission() async {
-    if (await Permission.manageExternalStorage.isGranted) {
-      return true;
-    }
+    if (Platform.isAndroid) {
+      if (await Permission.manageExternalStorage.isGranted) {
+        return true;
+      }
 
-    final status = await Permission.manageExternalStorage.request();
-    return status.isGranted;
+      final status = await Permission.manageExternalStorage.request();
+      return status.isGranted;
+    }
+    // No special permissions required for iOS
+    return true;
   }
 
   /// Fetches all commands from the file.
