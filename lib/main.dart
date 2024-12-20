@@ -252,7 +252,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               const Divider(),
               const Text(
-                'Ответы:',
+                'Responses:',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(
