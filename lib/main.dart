@@ -24,40 +24,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Function to listen to commands
-Future<String?> listenToCommand({
-  required Function(String) onResult,
-  Duration timeoutDuration = const Duration(seconds: 10),
-}) async {
-  final SpeechToText speechToText = SpeechToText();
-  String? response;
-
-  // Initialize speech-to-text
-  if (!await speechToText.initialize()) {
-    print('Распознавание речи недоступно');
-    return null;
-  }
-
-  // Start listening
-  await speechToText.listen(
-    onResult: (SpeechRecognitionResult result) {
-      if (result.finalResult) {
-        response = result.recognizedWords;
-        onResult(response!);
-      }
-    },
-    listenFor: timeoutDuration,
-    pauseFor: const Duration(seconds: 3),
-    localeId: 'ru_RU',
-    partialResults: false,
-  );
-
-  await Future.delayed(timeoutDuration);
-
-  await speechToText.stop();
-  return response;
-}
-
 class MyHomePage extends StatefulWidget {
   const MyHomePage({Key? key}) : super(key: key);
 
@@ -71,7 +37,6 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<Map<String, String>> _commandsAndResponses = [];
   List<String> _commands = [];
   String? _currentCommand;
-  Timer? _responseTimer;
   bool _isProcessing = false;
   final TextEditingController _commandController = TextEditingController();
 
@@ -99,8 +64,6 @@ class _MyHomePageState extends State<MyHomePage> {
         _currentCommand = randomCommand;
       });
 
-      _ttsService.speak(randomCommand);
-
       await _listenToResponse(randomCommand);
 
       if (!_isProcessing) break;
@@ -113,37 +76,46 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _listenToResponse(String command) async {
-    final completer = Completer<void>();
     String? userResponse;
 
-    _ttsService.speak(command);
+    // Speak the command
+    await _ttsService.speak(command);
 
-    // Wait for TTS to finish (introduce a delay)
     await Future.delayed(const Duration(seconds: 2));
 
-    // Start a response timer
-    _responseTimer = Timer(const Duration(seconds: 10), () {
-      completer.complete();
-    });
+    userResponse = await listenToCommand();
 
-    // Start listening to the user's response
-    userResponse = await listenToCommand(
-      onResult: (result) {
-        userResponse = result;
-        completer.complete();
-      },
-      timeoutDuration: const Duration(seconds: 10),
-    );
-
-    // Wait for the timer or user response
-    await completer.future;
-    _responseTimer?.cancel();
-
-    if (userResponse != null && userResponse!.isNotEmpty) {
-      // Save the command and response
-      _commandsAndResponses.add({'command': command, 'response': userResponse!});
+    if (userResponse != null && userResponse.isNotEmpty) {
+      _commandsAndResponses.add({'command': command, 'response': userResponse});
       await _saveResponsesToFile();
     }
+  }
+
+  Future<String?> listenToCommand() async {
+    final speechToText = SpeechToText();
+
+    if (!await speechToText.initialize()) {
+      print('Speech recognition not available');
+      return null;
+    }
+
+    String? response;
+    final completer = Completer<void>();
+
+    await speechToText.listen(
+      onResult: (result) {
+        if (result.finalResult) {
+          response = result.recognizedWords;
+          completer.complete();
+        }
+      },
+      listenFor: const Duration(seconds: 10),
+      localeId: 'ru_RU',
+    );
+
+    await completer.future; // Wait until a result is received
+    await speechToText.stop();
+    return response;
   }
 
   Future<void> _saveResponsesToFile() async {
@@ -154,7 +126,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final file = File(filePath);
     final lines = _commandsAndResponses
-        .map((entry) => 'Command: ${entry['command']}\nResponse: ${entry['response']}\n---')
+        .map((entry) =>
+            'Command: ${entry['command']}\nResponse: ${entry['response']}\n---')
         .join('\n');
     await file.writeAsString(lines, mode: FileMode.write);
   }
@@ -165,7 +138,6 @@ class _MyHomePageState extends State<MyHomePage> {
       _currentCommand = null;
     });
     _ttsService.stop();
-    _responseTimer?.cancel();
   }
 
   void _addCommand() async {
@@ -186,90 +158,114 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Speech-to-Text & TTS'),
-      ),
-      body: SizedBox(
-        height: MediaQuery.of(context).size.height - 100,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Процессор случайных команд',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                _currentCommand ?? 'Нажмите "Start" чтобы начать!',
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _startRandomCommandProcess,
-                child: const Text('Запуск случайных команд'),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _stopRandomCommandProcess,
-                child: const Text('Остановить процесс'),
-              ),
-              const SizedBox(height: 20),
-              const Divider(),
-              TextField(
-                maxLines: 5,
-                controller: _commandController,
-                decoration: const InputDecoration(
-                  alignLabelWithHint: true,
-                  labelText: 'Добавить новые команды',
-                  border: OutlineInputBorder(),
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Speech-to-Text & TTS'),
+        ),
+        body: SizedBox(
+          height: MediaQuery.of(context).size.height - 100,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
+                Text(
+                  _currentCommand ?? 'Нажмите "Start" чтобы начать!',
+                  style: const TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _addCommand,
-                child: const Text('Добавить команды'),
-              ),
-              const Divider(),
-              const Text(
-                'Доступные команды:',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(
-                height: 150,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _commands.length,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      title: Text(_commands[index]),
-                    );
-                  },
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[200],
+                      ),
+                      child: IconButton(
+                        onPressed: _startRandomCommandProcess,
+                        icon: const Icon(Icons.play_arrow),
+                        color: Colors.green,
+                        tooltip: 'Запуск случайных команд',
+                        iconSize: 36,
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[200],
+                      ),
+                      child: IconButton(
+                        onPressed: _stopRandomCommandProcess,
+                        icon: const Icon(Icons.stop),
+                        color: Colors.red,
+                        tooltip: 'Остановить процесс',
+                        iconSize: 36,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const Divider(),
-              const Text(
-                'Responses:',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(
-                height: 150,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _commandsAndResponses.length,
-                  itemBuilder: (context, index) {
-                    final entry = _commandsAndResponses[index];
-                    return ListTile(
-                      title: Text('Command: ${entry['command']}'),
-                      subtitle: Text('Response: ${entry['response']}'),
-                    );
-                  },
+                const SizedBox(height: 20),
+                const Divider(),
+                TextField(
+                  maxLines: 5,
+                  controller: _commandController,
+                  decoration: const InputDecoration(
+                    alignLabelWithHint: true,
+                    labelText: 'Добавить новые команды',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _addCommand,
+                  child: const Text('Добавить команды'),
+                ),
+                const Divider(),
+                const Text(
+                  'Доступные команды:',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(
+                  height: 150,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _commands.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        title: Text(_commands[index]),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(),
+                const Text(
+                  'Responses:',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(
+                  height: 150,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _commandsAndResponses.length,
+                    itemBuilder: (context, index) {
+                      final entry = _commandsAndResponses[index];
+                      return ListTile(
+                        title: Text('Command: ${entry['command']}'),
+                        subtitle: Text('Response: ${entry['response']}'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
