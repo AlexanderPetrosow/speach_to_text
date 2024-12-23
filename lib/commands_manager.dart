@@ -20,7 +20,6 @@ class CommandManager {
     return File('${directory.path}/$_commandsFileName');
   }
 
-  /// Ensures the file exists; creates it if it doesn't.
   Future<void> _ensureFileExists() async {
     final file = await _getCommandsFile();
     if (!await file.exists()) {
@@ -28,7 +27,6 @@ class CommandManager {
     }
   }
 
-  /// Requests storage permissions for Android.
   Future<bool> _requestStoragePermission() async {
     if (Platform.isAndroid) {
       if (await Permission.manageExternalStorage.isGranted) {
@@ -38,11 +36,9 @@ class CommandManager {
       final status = await Permission.manageExternalStorage.request();
       return status.isGranted;
     }
-    // No special permissions required for iOS
     return true;
   }
 
-  /// Fetches all commands from the file.
   Future<List<String>> getCommands() async {
     if (!await _requestStoragePermission()) {
       throw Exception("Storage permission denied.");
@@ -57,7 +53,6 @@ class CommandManager {
     return content.split('\n').where((line) => line.trim().isNotEmpty).toList();
   }
 
-  /// Adds a single command to the file.
   Future<void> addCommand(String command) async {
     if (!await _requestStoragePermission()) {
       throw Exception("Storage permission denied.");
@@ -69,7 +64,6 @@ class CommandManager {
     await file.writeAsString('$command\n', mode: FileMode.append);
   }
 
-  /// Adds multiple commands to the file.
   Future<void> addCommands(List<String> commands) async {
     if (!await _requestStoragePermission()) {
       throw Exception("Storage permission denied.");

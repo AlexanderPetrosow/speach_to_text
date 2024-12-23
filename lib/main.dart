@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:speech_recognizer_app/commands_manager.dart';
 import 'package:speech_recognizer_app/text_to_speech_service.dart';
 
@@ -35,6 +36,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final CommandManager _commandManager = CommandManager();
   final TextToSpeechService _ttsService = TextToSpeechService();
   final List<Map<String, String>> _commandsAndResponses = [];
+  final SpeechToText _speechToText = SpeechToText();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
   List<String> _commands = [];
   String? _currentCommand;
   bool _isProcessing = false;
@@ -75,37 +79,37 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<void> _playSound(String fileName) async {
+    try {
+      await _audioPlayer.play(AssetSource('sounds/$fileName'));
+    } catch (e) {
+      print('Error playing sound: $e');
+    }
+  }
+
   Future<void> _listenToResponse(String command) async {
     String? userResponse;
+
+    // Play the "start listening" sound
+    await _playSound('speech_to_text_listening.m4r');
 
     // Speak the command
     await _ttsService.speak(command);
 
     await Future.delayed(const Duration(seconds: 2));
 
-    userResponse = await listenToCommand();
-
-    if (userResponse != null && userResponse.isNotEmpty) {
-      _commandsAndResponses.add({'command': command, 'response': userResponse});
-      await _saveResponsesToFile();
-    }
-  }
-
-  Future<String?> listenToCommand() async {
-    final speechToText = SpeechToText();
-
-    if (!await speechToText.initialize()) {
-      print('Speech recognition not available');
-      return null;
-    }
-
-    String? response;
     final completer = Completer<void>();
 
-    await speechToText.listen(
+    if (!await _speechToText.initialize()) {
+      print('Speech recognition not available');
+      completer.complete();
+      return;
+    }
+
+    await _speechToText.listen(
       onResult: (result) {
         if (result.finalResult) {
-          response = result.recognizedWords;
+          userResponse = result.recognizedWords;
           completer.complete();
         }
       },
@@ -113,9 +117,20 @@ class _MyHomePageState extends State<MyHomePage> {
       localeId: 'ru_RU',
     );
 
-    await completer.future; // Wait until a result is received
-    await speechToText.stop();
-    return response;
+    // Wait for a result or timeout
+    await completer.future.timeout(const Duration(seconds: 10), onTimeout: () {
+      print('No response detected. Moving to next command.');
+    });
+
+    await _speechToText.stop();
+
+    // Play the "stop listening" sound
+    await _playSound('speech_to_text_stop.m4r');
+
+    if (userResponse != null && userResponse!.isNotEmpty) {
+      _commandsAndResponses.add({'command': command, 'response': userResponse!});
+      await _saveResponsesToFile();
+    }
   }
 
   Future<void> _saveResponsesToFile() async {
@@ -138,6 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _currentCommand = null;
     });
     _ttsService.stop();
+    _playSound('speech_to_text_cancel.m4r'); // Play the cancel sound
   }
 
   void _addCommand() async {
