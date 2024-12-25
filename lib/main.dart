@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_recognizer_app/commands_manager.dart';
 import 'package:speech_recognizer_app/text_to_speech_service.dart';
@@ -24,40 +23,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Function to listen to commands
-Future<String?> listenToCommand({
-  required Function(String) onResult,
-  Duration timeoutDuration = const Duration(seconds: 10),
-}) async {
-  final SpeechToText speechToText = SpeechToText();
-  String? response;
-
-  // Initialize speech-to-text
-  if (!await speechToText.initialize()) {
-    print('Распознавание речи недоступно');
-    return null;
-  }
-
-  // Start listening
-  await speechToText.listen(
-    onResult: (SpeechRecognitionResult result) {
-      if (result.finalResult) {
-        response = result.recognizedWords;
-        onResult(response!);
-      }
-    },
-    listenFor: timeoutDuration,
-    pauseFor: const Duration(seconds: 3),
-    localeId: 'ru_RU',
-    partialResults: false,
-  );
-
-  await Future.delayed(timeoutDuration);
-
-  await speechToText.stop();
-  return response;
-}
-
 class MyHomePage extends StatefulWidget {
   const MyHomePage({Key? key}) : super(key: key);
 
@@ -74,6 +39,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _responseTimer;
   bool _isProcessing = false;
   final TextEditingController _commandController = TextEditingController();
+  int _currentCommandIndex = 0;
 
   @override
   void initState() {
@@ -86,24 +52,23 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {});
   }
 
-  Future<void> _startRandomCommandProcess() async {
+  Future<void> _startSequentialCommandProcess() async {
     if (_isProcessing || _commands.isEmpty) return;
 
     setState(() {
       _isProcessing = true;
+      _currentCommandIndex = 0; // Reset to start from the first command
     });
 
-    while (_isProcessing) {
-      final randomCommand = (_commands..shuffle()).first;
+    while (_isProcessing && _currentCommandIndex < _commands.length) {
+      final command = _commands[_currentCommandIndex];
       setState(() {
-        _currentCommand = randomCommand;
+        _currentCommand = command;
       });
 
-      _ttsService.speak(randomCommand);
+      await _listenToResponse(command);
 
-      await _listenToResponse(randomCommand);
-
-      if (!_isProcessing) break;
+      _currentCommandIndex++; // Move to the next command
     }
 
     setState(() {
@@ -116,32 +81,38 @@ class _MyHomePageState extends State<MyHomePage> {
     final completer = Completer<void>();
     String? userResponse;
 
-    _ttsService.speak(command);
+    // Speak the command
+    await _ttsService.speak(command);
 
-    // Wait for TTS to finish (introduce a delay)
+    // Wait for TTS to finish
     await Future.delayed(const Duration(seconds: 2));
 
-    // Start a response timer
-    _responseTimer = Timer(const Duration(seconds: 10), () {
+    final speechToText = SpeechToText();
+    if (!await speechToText.initialize()) {
+      print('Speech recognition not available');
       completer.complete();
-    });
+      return;
+    }
 
-    // Start listening to the user's response
-    userResponse = await listenToCommand(
+    await speechToText.listen(
       onResult: (result) {
-        userResponse = result;
-        completer.complete();
+        if (result.finalResult) {
+          userResponse = result.recognizedWords;
+          completer.complete();
+        }
       },
-      timeoutDuration: const Duration(seconds: 10),
+      listenFor: const Duration(seconds: 10),
+      localeId: 'ru_RU',
     );
 
-    // Wait for the timer or user response
-    await completer.future;
-    _responseTimer?.cancel();
+    await completer.future.timeout(const Duration(seconds: 10), onTimeout: () {
+      print('No response detected. Moving to next command.');
+    });
+
+    await speechToText.stop();
 
     if (userResponse != null && userResponse!.isNotEmpty) {
-      // Save the command and response
-      _commandsAndResponses.add({'command': command, 'response': userResponse!});
+      _commandsAndResponses.add({'command': command, 'response': userResponse ?? ''});
       await _saveResponsesToFile();
     }
   }
@@ -154,12 +125,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final file = File(filePath);
     final lines = _commandsAndResponses
-        .map((entry) => 'Command: ${entry['command']}\nResponse: ${entry['response']}\n---')
+        .map((entry) =>
+            'Command: ${entry['command']}\nResponse: ${entry['response']}\n---')
         .join('\n');
     await file.writeAsString(lines, mode: FileMode.write);
   }
 
-  void _stopRandomCommandProcess() {
+  void _stopCommandProcess() {
     setState(() {
       _isProcessing = false;
       _currentCommand = null;
@@ -198,24 +170,24 @@ class _MyHomePageState extends State<MyHomePage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Text(
-                'Процессор случайных команд',
+                'Sequential Command Processor',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
               Text(
-                _currentCommand ?? 'Нажмите "Start" чтобы начать!',
+                _currentCommand ?? 'Press Start to begin!',
                 style: const TextStyle(fontSize: 16),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _startRandomCommandProcess,
-                child: const Text('Запуск случайных команд'),
+                onPressed: _startSequentialCommandProcess,
+                child: const Text('Start Commands'),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: _stopRandomCommandProcess,
-                child: const Text('Остановить процесс'),
+                onPressed: _stopCommandProcess,
+                child: const Text('Stop Process'),
               ),
               const SizedBox(height: 20),
               const Divider(),
@@ -224,18 +196,18 @@ class _MyHomePageState extends State<MyHomePage> {
                 controller: _commandController,
                 decoration: const InputDecoration(
                   alignLabelWithHint: true,
-                  labelText: 'Добавить новые команды',
+                  labelText: 'Add New Commands',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _addCommand,
-                child: const Text('Добавить команды'),
+                child: const Text('Add Commands'),
               ),
               const Divider(),
               const Text(
-                'Доступные команды:',
+                'Available Commands:',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(
