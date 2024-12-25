@@ -113,7 +113,9 @@ class _MyHomePageState extends State<MyHomePage> {
     await speechToText.stop();
 
     if (userResponse != null && userResponse!.isNotEmpty) {
-      _commandsAndResponses.add({'command': command, 'response': userResponse});
+      if (userResponse != null) {
+        _commandsAndResponses.add({'command': command, 'response': userResponse!});
+      }
       await _saveResponsesToFile();
     }
   }
