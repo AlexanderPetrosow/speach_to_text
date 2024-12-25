@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_recognizer_app/commands_manager.dart';
 import 'package:speech_recognizer_app/text_to_speech_service.dart';
@@ -112,7 +113,7 @@ class _MyHomePageState extends State<MyHomePage> {
     await speechToText.stop();
 
     if (userResponse != null && userResponse!.isNotEmpty) {
-      _commandsAndResponses.add({'command': command, 'response': userResponse ?? ''});
+      _commandsAndResponses.add({'command': command, 'response': userResponse});
       await _saveResponsesToFile();
     }
   }
