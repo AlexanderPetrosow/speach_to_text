@@ -15,7 +15,7 @@ workflows:
           agvtool new-version -all $(($BUILD_NUMBER + 1))
       - name: Install Flutter dependencies
         script: |
-          flutter packages pub get
+          flutter pub get
       - name: Build iOS app
         script: |
           flutter build ios --release --no-codesign
