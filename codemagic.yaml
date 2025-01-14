@@ -1,0 +1,27 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    environment:
+      groups:
+        - ios_signing
+      xcode: latest
+    scripts:
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          cd $FCI_BUILD_DIR/ios
+          agvtool new-version -all $(($BUILD_NUMBER + 1))
+      - name: Install Flutter dependencies
+        script: |
+          flutter packages pub get
+      - name: Build iOS app
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Build .ipa file
+        script: |
+          xcodebuild -workspace ./ios/Runner.xcworkspace -scheme Runner -sdk iphoneos -configuration Release archive -archivePath $PWD/build/Runner.xcarchive
+          xcodebuild -exportArchive -archivePath $PWD/build/Runner.xcarchive -exportOptionsPlist ./ios/exportOptions.plist -exportPath $PWD/build/Runner
+    artifacts:
+      - build/Runner/*.ipa
