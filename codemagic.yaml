@@ -2,6 +2,7 @@ workflows:
   ios-workflow:
     name: iOS Workflow
     environment:
+      flutter: 3.6.0 # Specify the desired Flutter SDK version
       groups:
         - ios_signing
       xcode: latest
