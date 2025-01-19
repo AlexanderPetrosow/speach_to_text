@@ -58,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       _isProcessing = true;
-      _currentCommandIndex = 0; // Reset to start from the first command
+      _currentCommandIndex = 0;
     });
 
     while (_isProcessing && _currentCommandIndex < _commands.length) {
@@ -114,10 +114,69 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (userResponse != null && userResponse!.isNotEmpty) {
       if (userResponse != null) {
-        _commandsAndResponses.add({'command': command, 'response': userResponse!});
+        _commandsAndResponses
+            .add({'command': command, 'response': userResponse!});
       }
       await _saveResponsesToFile();
     }
+  }
+
+  void _showAddCommandsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final TextEditingController commandInputController =
+            TextEditingController();
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16.0,
+            right: 16.0,
+            top: 16.0,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add Commands',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commandInputController,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Enter commands (one per line)',
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  final commands = commandInputController.text
+                      .split('\n')
+                      .map((command) => command.trim())
+                      .where((command) => command.isNotEmpty)
+                      .toList();
+
+                  if (commands.isNotEmpty) {
+                    await _commandManager.addCommands(commands);
+                    setState(() {
+                      _commands.addAll(commands);
+                    });
+                    Navigator.pop(context); // Close the modal
+                  }
+                },
+                child: const Text('Add Commands'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _saveResponsesToFile() async {
@@ -132,6 +191,16 @@ class _MyHomePageState extends State<MyHomePage> {
             'Command: ${entry['command']}\nResponse: ${entry['response']}\n---')
         .join('\n');
     await file.writeAsString(lines, mode: FileMode.write);
+  }
+
+  Future<void> _deleteCommand(int index) async {
+    final String commandToDelete = _commands[index];
+
+    await _commandManager.deleteCommand(commandToDelete);
+
+    setState(() {
+      _commands.removeAt(index);
+    });
   }
 
   void _stopCommandProcess() {
@@ -172,45 +241,31 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text(
-                'Sequential Command Processor',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               Text(
-                _currentCommand ?? 'Press Start to begin!',
+                _currentCommand ?? 'Нажмите кнопку "старт"',
                 style: const TextStyle(fontSize: 16),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _startSequentialCommandProcess,
-                child: const Text('Start Commands'),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  ElevatedButton(
+                    onPressed: _startSequentialCommandProcess,
+                    child: Icon(Icons.play_arrow),
+                  ),
+                  ElevatedButton(
+                    onPressed: _stopCommandProcess,
+                    child: Icon(Icons.stop),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _stopCommandProcess,
-                child: const Text('Stop Process'),
-              ),
-              const SizedBox(height: 20),
-              const Divider(),
-              TextField(
-                maxLines: 5,
-                controller: _commandController,
-                decoration: const InputDecoration(
-                  alignLabelWithHint: true,
-                  labelText: 'Add New Commands',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _addCommand,
-                child: const Text('Add Commands'),
-              ),
+              SizedBox(height: 20),
               const Divider(),
               const Text(
-                'Available Commands:',
+                'Доступные команды:',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(
@@ -221,13 +276,19 @@ class _MyHomePageState extends State<MyHomePage> {
                   itemBuilder: (context, index) {
                     return ListTile(
                       title: Text(_commands[index]),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () async {
+                          await _deleteCommand(index);
+                        },
+                      ),
                     );
                   },
                 ),
               ),
               const Divider(),
               const Text(
-                'Responses:',
+                'Ответы:',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(
@@ -247,6 +308,10 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddCommandsModal,
+        child: const Icon(Icons.add),
       ),
     );
   }

@@ -53,6 +53,16 @@ class CommandManager {
     return content.split('\n').where((line) => line.trim().isNotEmpty).toList();
   }
 
+  Future<void> deleteCommand(String commandToDelete) async {
+    final file = await _getCommandsFile();
+    final List<String> commands = await getCommands();
+
+    if (commands.contains(commandToDelete)) {
+      commands.remove(commandToDelete);
+      await file.writeAsString(commands.join('\n'));
+    }
+  }
+
   Future<void> addCommand(String command) async {
     if (!await _requestStoragePermission()) {
       throw Exception("Storage permission denied.");
@@ -64,15 +74,14 @@ class CommandManager {
     await file.writeAsString('$command\n', mode: FileMode.append);
   }
 
-  Future<void> addCommands(List<String> commands) async {
-    if (!await _requestStoragePermission()) {
-      throw Exception("Storage permission denied.");
-    }
+ Future<void> addCommands(List<String> commands) async {
+  final file = await _getCommandsFile();
+  final List<String> existingCommands = await getCommands();
 
-    final filteredCommands = commands.where((cmd) => cmd.trim().isNotEmpty).toList();
-    if (filteredCommands.isEmpty) return;
-    await _ensureFileExists();
-    final file = await _getCommandsFile();
-    await file.writeAsString(filteredCommands.join('\n') + '\n', mode: FileMode.append);
+  final newCommands = commands.where((cmd) => !existingCommands.contains(cmd)).toList();
+  if (newCommands.isNotEmpty) {
+    await file.writeAsString('${newCommands.join('\n')}\n', mode: FileMode.append);
   }
+}
+
 }
