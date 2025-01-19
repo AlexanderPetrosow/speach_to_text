@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_recognizer_app/commands_manager.dart';
 import 'package:speech_recognizer_app/text_to_speech_service.dart';
@@ -39,7 +38,6 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _currentCommand;
   Timer? _responseTimer;
   bool _isProcessing = false;
-  final TextEditingController _commandController = TextEditingController();
   int _currentCommandIndex = 0;
 
   @override
@@ -69,7 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
       await _listenToResponse(command);
 
-      _currentCommandIndex++; // Move to the next command
+      _currentCommandIndex++; 
     }
 
     setState(() {
@@ -131,17 +129,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
             left: 16.0,
             right: 16.0,
             top: 16.0,
+            bottom: 16.0,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Add Commands',
+                'Добавить команды',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
@@ -150,28 +148,25 @@ class _MyHomePageState extends State<MyHomePage> {
                 maxLines: 5,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: 'Enter commands (one per line)',
+                  labelText: 'Добавьте команды (каждая с новой строки)',
                 ),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  final commands = commandInputController.text
-                      .split('\n')
-                      .map((command) => command.trim())
-                      .where((command) => command.isNotEmpty)
-                      .toList();
+              ElevatedButton(onPressed: () async {
+                final commands = commandInputController.text
+                    .split('\n')
+                    .map((command) => command.trim())
+                    .where((command) => command.isNotEmpty)
+                    .toList();
 
-                  if (commands.isNotEmpty) {
-                    await _commandManager.addCommands(commands);
-                    setState(() {
-                      _commands.addAll(commands);
-                    });
-                    Navigator.pop(context); // Close the modal
-                  }
-                },
-                child: const Text('Add Commands'),
-              ),
+                if (commands.isNotEmpty) {
+                  await _commandManager.addCommands(commands);
+                  setState(() {
+                    _commands.addAll(commands);
+                  });
+                  Navigator.pop(context);
+                }
+              }, child: const Text('Добавить команды')),
             ],
           ),
         );
@@ -210,22 +205,6 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     _ttsService.stop();
     _responseTimer?.cancel();
-  }
-
-  void _addCommand() async {
-    final newCommands = _commandController.text
-        .split('\n')
-        .map((command) => command.trim())
-        .where((command) => command.isNotEmpty)
-        .toList();
-
-    if (newCommands.isNotEmpty) {
-      await _commandManager.addCommands(newCommands);
-      setState(() {
-        _commands.addAll(newCommands);
-      });
-      _commandController.clear();
-    }
   }
 
   @override
