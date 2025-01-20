@@ -4,9 +4,9 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 class SpeechToTextWidget extends StatefulWidget {
-  final Function(String) onResult; // Callback for final results
-  final Function(String) onPartialResult; // Callback for partial results
-  final Function() onTimeout; // Callback when listening times out
+  final ValueChanged<String> onResult;         // Колбэк для финальных результатов
+  final ValueChanged<String> onPartialResult;  // Колбэк для промежуточных
+  final VoidCallback onTimeout;               // Колбэк при истечении времени
   final Duration timeoutDuration;
 
   const SpeechToTextWidget({
@@ -18,10 +18,10 @@ class SpeechToTextWidget extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _SpeechToTextWidgetState createState() => _SpeechToTextWidgetState();
+  SpeechToTextWidgetState createState() => SpeechToTextWidgetState();
 }
 
-class _SpeechToTextWidgetState extends State<SpeechToTextWidget> {
+class SpeechToTextWidgetState extends State<SpeechToTextWidget> {
   final SpeechToText _speechToText = SpeechToText();
   bool _isListening = false;
   bool _speechEnabled = false;
@@ -33,19 +33,22 @@ class _SpeechToTextWidgetState extends State<SpeechToTextWidget> {
     _initializeSpeech();
   }
 
-  /// Initialize speech recognition with microphone permission
+  /// Инициализация распознавания + проверка разрешения на микрофон
   Future<void> _initializeSpeech() async {
     if (await Permission.microphone.request().isGranted) {
       bool available = await _speechToText.initialize(
         onError: (error) {
+          if (!mounted) return;
           print('Speech error: ${error.errorMsg}');
           setState(() => _statusMessage = "Ошибка распознавания: ${error.errorMsg}");
         },
         onStatus: (status) {
+          if (!mounted) return;
           print('Speech status: $status');
           setState(() => _statusMessage = _mapStatusToMessage(status));
         },
       );
+      if (!mounted) return;
       setState(() {
         _speechEnabled = available;
         if (!available) {
@@ -54,15 +57,20 @@ class _SpeechToTextWidgetState extends State<SpeechToTextWidget> {
       });
     } else {
       print("Microphone permission not granted");
+      if (!mounted) return;
       setState(() {
         _statusMessage = "Нет разрешения на микрофон";
       });
     }
   }
 
-  /// Start listening and setup timeout
-  Future<void> _startListening() async {
-    if (!_speechEnabled) return;
+  /// Публичный метод: начать прослушивание (можно вызвать из родителя через GlobalKey)
+  Future<void> startListening() async {
+    if (!_speechEnabled) {
+      print("Speech recognition not available");
+      return;
+    }
+
     await _speechToText.listen(
       onResult: _onSpeechResult,
       listenFor: widget.timeoutDuration,
@@ -70,65 +78,32 @@ class _SpeechToTextWidgetState extends State<SpeechToTextWidget> {
       partialResults: true,
     );
 
+    if (!mounted) return;
     setState(() {
       _isListening = true;
       _statusMessage = "Слушаю...";
     });
 
-    // Automatically stop listening after timeoutDuration
+    // Принудительно останавливаем прослушивание через timeoutDuration
     Future.delayed(widget.timeoutDuration, () {
       if (_isListening) {
-        _stopListening();
+        stopListening();
         widget.onTimeout();
       }
     });
   }
 
-  Future<String?> listenToCommand({
-  required Function(String) onResult,
-  Duration timeoutDuration = const Duration(seconds: 10),
-}) async {
-  final SpeechToText speechToText = SpeechToText();
-  String? response;
-
-  // Initialize speech-to-text
-  if (!await speechToText.initialize()) {
-    print('Speech recognition not available');
-    return null;
-  }
-
-  // Start listening
-  await speechToText.listen(
-    onResult: (SpeechRecognitionResult result) {
-      if (result.finalResult) {
-        response = result.recognizedWords;
-        onResult(response!);
-      }
-    },
-    listenFor: timeoutDuration,
-    pauseFor: const Duration(seconds: 3),
-    localeId: 'ru_RU',
-    partialResults: false,
-  );
-
-  // Wait for timeout duration
-  await Future.delayed(timeoutDuration);
-
-  // Stop listening after timeout
-  await speechToText.stop();
-  return response;
-}
-
-  /// Stop listening
-  Future<void> _stopListening() async {
+  /// Публичный метод: остановить прослушивание (можно вызвать из родителя через GlobalKey)
+  Future<void> stopListening() async {
     await _speechToText.stop();
+    if (!mounted) return;
     setState(() {
       _isListening = false;
       _statusMessage = "Прослушивание остановлено";
     });
   }
 
-  /// Handle speech recognition results
+  /// Обработка результатов
   void _onSpeechResult(SpeechRecognitionResult result) {
     if (result.finalResult) {
       widget.onResult(result.recognizedWords);
@@ -137,16 +112,25 @@ class _SpeechToTextWidgetState extends State<SpeechToTextWidget> {
     }
   }
 
-  /// Map speech recognition statuses to user-friendly messages
+  /// Преобразуем статус движка в сообщение
   String _mapStatusToMessage(String status) {
     switch (status) {
       case "listening":
         return "Слушаю...";
       case "notListening":
         return "Ожидание команды";
+      case "done":
+        return "Обработка завершена";
       default:
         return "Статус: $status";
     }
+  }
+
+  @override
+  void dispose() {
+    _speechToText.stop();
+    _speechToText.cancel();
+    super.dispose();
   }
 
   @override
@@ -155,11 +139,11 @@ class _SpeechToTextWidgetState extends State<SpeechToTextWidget> {
       mainAxisSize: MainAxisSize.min,
       children: [
         ElevatedButton.icon(
-          onPressed: _isListening ? _stopListening : _startListening,
+          onPressed: _isListening ? stopListening : startListening,
           icon: Icon(_isListening ? Icons.mic_off : Icons.mic),
-          label: Text(_isListening ? 'Прекратить слушать' : 'Начать слушать'),
+          label: Text(_isListening ? 'Прекратить' : 'Начать'),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         Text(
           _statusMessage,
           style: TextStyle(color: _speechEnabled ? Colors.black : Colors.red),

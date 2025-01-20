@@ -132,7 +132,7 @@ class _MyHomePageState extends State<MyHomePage> {
             left: 16.0,
             right: 16.0,
             top: 16.0,
-            bottom: 16.0,
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -222,7 +222,7 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               SizedBox(height: 20),
               Text(
-                _currentCommand ?? 'Нажмите кнопку "старт"',
+                _currentCommand ?? 'Нажмите кнопку "Старт"',
                 style: const TextStyle(fontSize: 16),
                 textAlign: TextAlign.center,
               ),
@@ -271,7 +271,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(
-                height: 150,
+                height: 350,
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: _commandsAndResponses.length,
