@@ -84,7 +84,7 @@ class _MyHomePageState extends State<MyHomePage> {
     await _ttsService.speak(command);
 
     // Wait for TTS to finish
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 3));
 
     final speechToText = SpeechToText();
     if (!await speechToText.initialize()) {
@@ -100,7 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
           completer.complete();
         }
       },
-      listenFor: const Duration(seconds: 10),
+      // listenFor: const Duration(seconds: 40),
       localeId: 'ru_RU',
     );
 
