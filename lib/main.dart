@@ -209,88 +209,93 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Speech-to-Text & TTS'),
-      ),
-      body: SizedBox(
-        height: MediaQuery.of(context).size.height - 100,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(height: 20),
-              Text(
-                _currentCommand ?? 'Нажмите кнопку "Старт"',
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  ElevatedButton(
-                    onPressed: _startSequentialCommandProcess,
-                    child: Icon(Icons.play_arrow),
-                  ),
-                  ElevatedButton(
-                    onPressed: _stopCommandProcess,
-                    child: Icon(Icons.stop),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-              const Divider(),
-              const Text(
-                'Доступные команды:',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(
-                height: 150,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _commands.length,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      title: Text(_commands[index]),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () async {
-                          await _deleteCommand(index);
-                        },
-                      ),
-                    );
-                  },
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).requestFocus(FocusNode());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Speech-to-Text & TTS'),
+        ),
+        body: SizedBox(
+          height: MediaQuery.of(context).size.height - 100,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(height: 20),
+                Text(
+                  _currentCommand ?? 'Нажмите кнопку "Старт"',
+                  style: const TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const Divider(),
-              const Text(
-                'Ответы:',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(
-                height: 350,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _commandsAndResponses.length,
-                  itemBuilder: (context, index) {
-                    final entry = _commandsAndResponses[index];
-                    return ListTile(
-                      title: Text('Command: ${entry['command']}'),
-                      subtitle: Text('Response: ${entry['response']}'),
-                    );
-                  },
+                SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _startSequentialCommandProcess,
+                      child: Icon(Icons.play_arrow),
+                    ),
+                    ElevatedButton(
+                      onPressed: _stopCommandProcess,
+                      child: Icon(Icons.stop),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                SizedBox(height: 20),
+                const Divider(),
+                const Text(
+                  'Доступные команды:',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(
+                  height: 150,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _commands.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        title: Text(_commands[index]),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () async {
+                            await _deleteCommand(index);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(),
+                const Text(
+                  'Ответы:',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(
+                  height: 350,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _commandsAndResponses.length,
+                    itemBuilder: (context, index) {
+                      final entry = _commandsAndResponses[index];
+                      return ListTile(
+                        title: Text('Command: ${entry['command']}'),
+                        subtitle: Text('Response: ${entry['response']}'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddCommandsModal,
-        child: const Icon(Icons.add),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _showAddCommandsModal,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
+
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class CommandManager {
   final String _commandsFileName = 'user_commands.txt';
@@ -36,6 +37,7 @@ class CommandManager {
       final status = await Permission.manageExternalStorage.request();
       return status.isGranted;
     }
+    // No need to request permissions for iOS
     return true;
   }
 
@@ -74,14 +76,13 @@ class CommandManager {
     await file.writeAsString('$command\n', mode: FileMode.append);
   }
 
- Future<void> addCommands(List<String> commands) async {
-  final file = await _getCommandsFile();
-  final List<String> existingCommands = await getCommands();
+  Future<void> addCommands(List<String> commands) async {
+    final file = await _getCommandsFile();
+    final List<String> existingCommands = await getCommands();
 
-  final newCommands = commands.where((cmd) => !existingCommands.contains(cmd)).toList();
-  if (newCommands.isNotEmpty) {
-    await file.writeAsString('${newCommands.join('\n')}\n', mode: FileMode.append);
+    final newCommands = commands.where((cmd) => !existingCommands.contains(cmd)).toList();
+    if (newCommands.isNotEmpty) {
+      await file.writeAsString('${newCommands.join('\n')}\n', mode: FileMode.append);
+    }
   }
-}
-
 }
